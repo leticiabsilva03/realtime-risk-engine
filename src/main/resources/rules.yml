@@ -1,0 +1,70 @@
+# ============================================================
+# rules.yml — Configuração do motor de regras
+#
+# IMPORTANTE: Qualquer mudança neste arquivo deve incrementar
+# o campo `version`. Esse valor é gravado em cada registro de
+# auditoria — é a única forma de saber qual conjunto de regras
+# gerou uma determinada decisão retroativamente.
+#
+# Convenção de versão: MAJOR.MINOR.PATCH
+#   MAJOR → mudança de comportamento de score (ex: novo peso)
+#   MINOR → nova regra adicionada ou regra removida
+#   PATCH → ajuste de threshold sem mudança de lógica
+# ============================================================
+
+rules:
+  version: "1.0.0"
+
+  high-amount:
+    enabled: true
+    # Valor em reais acima do qual a regra é ativada
+    threshold: 5000.00
+    # Score adicionado ao total quando a regra dispara
+    score: 30
+
+  velocity:
+    enabled: true
+    # Número máximo de transações permitidas na janela de tempo
+    max-transactions: 5
+    # Janela de tempo em minutos
+    window-minutes: 10
+    score: 25
+
+  device-fingerprint:
+    enabled: true
+    # Score alto porque device compartilhado entre contas é sinal clássico de account takeover
+    window-minutes: 60
+    score: 35
+
+  geolocation:
+    enabled: true
+    # Janela em minutos para detectar impossibilidade física de deslocamento
+    # Ex: transação em SP e outra em Miami com 47 minutos de intervalo = impossível
+    impossibility-window-minutes: 120
+    # Países com histórico elevado de fraude — lista atualizada pelo time de prevenção
+    high-risk-countries:
+      - "NG"   # Nigéria
+      - "RO"   # Romênia
+      - "VN"   # Vietnã
+      - "PK"   # Paquistão
+    score-impossibility: 40
+    score-high-risk-country: 20
+
+  odd-hours:
+    enabled: true
+    # Horário de início da janela suspeita (inclusivo), em hora UTC
+    start-hour: 0    # 00:00
+    # Horário de fim da janela suspeita (exclusivo), em hora UTC
+    end-hour: 5      # até 04:59
+    score: 15
+
+  new-merchant:
+    enabled: true
+    # Só ativa quando o valor supera este mínimo — transações pequenas em merchant novo são normais
+    min-amount-to-trigger: 1000.00
+    score: 20
+
+  blacklist:
+    enabled: true
+    # Score máximo garante BLOCK imediato — não há threshold que supere 100
+    score: 100
