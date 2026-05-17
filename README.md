@@ -1,69 +1,83 @@
 # Realtime Risk Engine
 
-Motor de regras para avaliação de risco em transações financeiras em tempo real.
+A rule-based fraud detection engine for financial transactions. Receives a transaction via REST API, evaluates it against 7 configurable rules, and returns a risk decision with a score from 0 to 100, with full audit trail, Redis caching, circuit breaker, and Prometheus/Grafana observability.
 
-Recebe uma transação via API REST, executa 7 regras configuráveis e retorna uma decisão com score de 0 a 100.
+Built to explore how fraud detection systems work in production fintechs: composable rules, observable scoring, zero-redeploy configuration.
 
----
-
-## Decisões
-
-| Score | Decisão |
-|-------|---------|
-| 0 – 39 | APPROVE |
-| 40 – 69 | REVIEW |
-| 70 – 100 | BLOCK |
+![Java](https://img.shields.io/badge/Java-25-orange?style=flat-square)
+![Spring Boot](https://img.shields.io/badge/Spring_Boot-4-green?style=flat-square)
+![Docker](https://img.shields.io/badge/Docker-ready-blue?style=flat-square)
+![Coverage](https://img.shields.io/badge/coverage-80%25_min-brightgreen?style=flat-square)
 
 ---
 
-## Regras
+## How it works
 
-| Regra | O que detecta |
-|-------|--------------|
-| HighAmountRule | Valor acima de R$ 5.000 |
-| VelocityRule | Mais de 5 transações em 10 minutos |
-| DeviceFingerprintRule | Mesmo device em múltiplos usuários |
-| GeolocationRule | País de risco ou viagem fisicamente impossível |
-| OddHoursRule | Transação entre 00h e 05h UTC |
-| NewMerchantRule | Primeira compra em loja nova com valor alto |
-| BlacklistRule | Usuário, device ou loja na lista negra |
+Each transaction is scored by 7 independent rules. Scores are summed and mapped to a decision:
 
-Todas as regras são configuráveis via `rules.yml`, não sendo necessário redeploy para ajustar thresholds.
+| Score   | Decision  |
+|---------|-----------|
+| 0 – 39  | `APPROVE` |
+| 40 – 69 | `REVIEW`  |
+| 70 – 100| `BLOCK`   |
+
+Rules are configurable via `rules.yml` — no redeploy needed to adjust thresholds.
+
+---
+
+## Rules
+
+| Rule | What it detects |
+|------|----------------|
+| `HighAmountRule` | Transaction above R$ 5,000 |
+| `VelocityRule` | More than 5 transactions in 10 minutes |
+| `DeviceFingerprintRule` | Same device used across multiple users |
+| `GeolocationRule` | High-risk country or physically impossible travel |
+| `OddHoursRule` | Transaction between 00:00 and 05:00 UTC |
+| `NewMerchantRule` | First purchase at a new merchant with high amount |
+| `BlacklistRule` | User, device or merchant on blocklist |
 
 ---
 
 ## Stack
 
-Java 25 · Spring Boot 4 · PostgreSQL 15 · Redis 7 · Resilience4j · Testcontainers · Micrometer · Prometheus · Grafana · Docker
+| Layer | Technology |
+|-------|-----------|
+| API | Java 25 · Spring Boot 4 · REST |
+| Persistence | PostgreSQL 15 |
+| Cache | Redis 7 + Resilience4j circuit breaker |
+| Observability | Micrometer · Prometheus · Grafana |
+| Testing | JUnit · Testcontainers · JaCoCo (80% min) |
+| Infrastructure | Docker · Docker Compose |
 
 ---
 
-## Como rodar
+## Running locally
 
-**Pré-requisitos:** Java 25, Docker, Maven
+**Prerequisites:** Java 25, Docker, Maven
 
 ```bash
-# Empacota
+# Build
 ./mvnw clean package -DskipTests
 
-# Sobe tudo (API + PostgreSQL + Redis + Prometheus + Grafana)
+# Start all services (API + PostgreSQL + Redis + Prometheus + Grafana)
 docker-compose up -d
 ```
 
-A API estará disponível em `http://localhost:8080`.
+API available at `http://localhost:8080`.
 
 ---
 
-## Endpoints
+## API
 
 ```
-POST /api/v1/transactions/evaluate   → avalia e persiste no audit
-POST /api/v1/transactions/simulate   → avalia sem persistir
-GET  /actuator/health                → saúde da aplicação
-GET  /actuator/prometheus            → métricas
+POST /api/v1/transactions/evaluate   → evaluate and persist to audit log
+POST /api/v1/transactions/simulate   → evaluate without persisting
+GET  /actuator/health                → health check
+GET  /actuator/prometheus            → metrics
 ```
 
-### Exemplo de request
+### Request example
 
 ```json
 {
@@ -78,7 +92,7 @@ GET  /actuator/prometheus            → métricas
 }
 ```
 
-### Exemplo de response
+### Response example
 
 ```json
 {
@@ -99,9 +113,9 @@ GET  /actuator/prometheus            → métricas
 
 ---
 
-## Monitoramento
+## Observability
 
-| Serviço | URL |
+| Service | URL |
 |---------|-----|
 | Grafana | http://localhost:3000 (admin/admin) |
 | Prometheus | http://localhost:9090 |
@@ -109,31 +123,30 @@ GET  /actuator/prometheus            → métricas
 
 ---
 
-## Testes
+## Tests
 
 ```bash
-# Unitários
+# Unit tests only
 ./mvnw test
 
-# Unitários + integração (requer Docker)
+# Unit + integration tests (requires Docker)
 ./mvnw verify
 ```
 
-Cobertura mínima: 80% (JaCoCo falha o build se não atingir).
+Minimum 80% coverage enforced by JaCoCo — build fails if not met.
 
 ---
 
-## Estrutura
+## Project structure
 
 ```
 src/main/java/com/fraudengine/
-├── api/          # Controller, DTOs, tratamento de erros
-├── config/       # RulesConfig (@ConfigurationProperties)
-├── domain/       # Regras de negócio, modelos, serviços
-├── engine/       # RuleEngine e as 7 regras
+├── api/              # Controllers, DTOs, error handling
+├── config/           # RulesConfig (@ConfigurationProperties)
+├── domain/           # Business rules, models, services
+├── engine/           # RuleEngine and the 7 rules
 └── infrastructure/
-    ├── cache/        # RedisCacheService com Circuit Breaker
+    ├── cache/        # RedisCacheService with circuit breaker
     ├── observability/ # EvaluationLogger
-    └── persistence/   # AuditEntity, AuditMapper
+    └── persistence/  # AuditEntity, AuditMapper
 ```
-
